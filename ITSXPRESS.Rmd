@@ -1,0 +1,709 @@
+---
+title: "ITS WORKFLOW-QIIME2"
+author: "Steph"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    theme: readable
+    highlight: tango
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+# I. ITS WORKFLOW-QIIME2
+
+#### **Script to process ITS sequences from LMNP and IPNP**
+
+
+## 1. IMPORTING AND DEMULTIPLEXING SEQUENCES
+
+
+### IMPORTING TO QIIME2
+
+- Make directories for each library
+
+```
+mkdir ITS1
+mkdir ITS2
+mkdir ITS3
+mkdir ITS4
+mkdir ITS5
+mkdir ITS6
+mkdir ITS7
+mkdir ITS8
+mkdir ITS9
+
+```
+
+- Loop to rename forward seqs
+
+```
+for i in ITS* ;do mv ITS*/ITS_*1.fastq.gz  ITS*/forward.fastq.gz ; done
+```
+
+- Loop to rename reverse seqs
+
+```
+for i in ITS* ;do mv ITS*/ITS_*2.fastq.gz  ITS*/reverse.fastq.gz ; done
+```
+
+- Loop to import files to QIIME2
+
+```
+for i in ITS*; do qiime tools import --type MultiplexedPairedEndBarcodeInSequence --input-path $i --output-path $i.qza ; done
+
+```
+### DEMULTIPLEXING WITH CUTADAPT
+
+```
+qiime cutadapt demux-paired\
+  --i-seqs its1.qza\
+  --m-forward-barcodes-file ../../maps_its/its1.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its1_demux
+
+qiime cutadapt demux-paired\
+  --i-seqs its2.qza\
+  --m-forward-barcodes-file ../../maps_its/its2.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its2_demux
+
+qiime cutadapt demux-paired\
+  --i-seqs its3.qza\
+  --m-forward-barcodes-file ../../maps_its/its3.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its3_demux
+
+qiime cutadapt demux-paired\
+  --i-seqs its4.qza --m-forward-barcodes-file ../../maps_its/its4.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its4_demux
+
+qiime cutadapt demux-paired  --i-seqs its5.qza\
+  --m-forward-barcodes-file ../../maps_its/its5.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its5_demux
+
+qiime cutadapt demux-paired  --i-seqs its6.qza\
+  --m-forward-barcodes-file ../../maps_its/its6.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its6_demux
+
+qiime cutadapt demux-paired  --i-seqs its7.qza\
+  --m-forward-barcodes-file ../../maps_its/its7.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its7_demux
+
+qiime cutadapt demux-paired\
+  --i-seqs its8.qza\
+  --m-forward-barcodes-file ../../maps_its/its8.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its8_demux
+
+qiime cutadapt demux-paired\
+  --i-seqs its9.qza\
+  --m-forward-barcodes-file ../../maps_its/its9.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its9_demux
+
+```
+
+## 2. ITSXPRESS
+
+### OPTION 1: ITSXPRESS EN QIIME2 (TESTING)
+
+- ITSxpress in QIIME2
+
+```
+for i in its*_demux ; do qiime itsxpress trim-pair --i-per-sample-sequences $i/per_sample_sequences.qza --p-region ITS2 --p-taxa F --o-trimmed itsxpress_2024_$i;done
+
+for i in its*_demux ; do qiime itsxpress trim-pair-output-unmerged --i-per-sample-sequences $i/per_sample_sequences.qza --p-region ITS2 --p-taxa F --o-trimmed itsxpress_2024_unmerged$i;done
+
+
+```
+
+- Exporting and importing demultiplexed
+
+```
+for i in itsxpress_2024_its*; do qiime tools export --input-path $i --output-path exported; done
+```
+
+```
+qiime tools import  --type 'SampleData[SequencesWithQuality]'  --input-path manifest.txt  --output-path single-end-demux-qiime2.qza  --input-format SingleEndFastqManifestPhred33V2
+```
+
+
+### OPTION 2: STANDALONE ITSXPRESS
+
+- Exporting data
+
+```
+for i in its*_demux; do qiime tools export  --input-path  $i/per_sample_sequences.qza --output-path  exported_$i; done
+
+```
+
+- Move all data to one directory and run this bash script (*chatGPT*):
+
+```{bash, eval=FALSE}
+
+#!/bin/bash
+
+# Set the path to the itsxpress executable
+ITSXPRESS_EXECUTABLE="itsxpress"
+
+# Loop through the files
+for forward_file in *_R1_001.fastq.gz; do
+    # Extract the sample name from the forward file
+    sample_name=$(basename "$forward_file" _R1_001.fastq.gz)
+
+    # Construct the reverse file name
+    reverse_file="${sample_name}_R2_001.fastq.gz"
+
+    # Run itsxpress command
+    $ITSXPRESS_EXECUTABLE --fastq "$forward_file" --fastq2 "$reverse_file" --region ITS2 \
+        --taxa Fungi --log "${sample_name}_logfile.txt" --outfile "${sample_name}_trimmed_reads.fastq.gz" --threads 2
+
+    # Optionally, you can print a message indicating the completion of each iteration
+    echo "Processing $forward_file and $reverse_file"
+done
+```
+
+- Import to QIIME2
+
+```
+qiime tools import\
+  --type 'SampleData[SequencesWithQuality]'\
+  --input-path manifest.txt\
+  --output-path single-end-demux-standalone.qza\
+  --input-format SingleEndFastqManifestPhred33V2
+```
+
+## 2. ASV's APPROACH
+
+- Run DADA2 on the two data-sets. 
+
+```
+ for i in *; do qiime dada2 denoise-single --i-demultiplexed-seqs $i --p-trunc-len 0 --p-n-threads 4 --output-dir dada2_$i; done
+```
+
+- Filter seqs by length (>50bp)
+
+```{bash, eval=FALSE}
+qiime feature-table filter-seqs\
+  --m-metadata-file dada2_single-end-demux-qiime2.qza/representative_sequences.qza\
+  --i-data dada2_single-end-demux-qiime2.qza/representative_sequences.qza\
+  --o-filtered-data representative_sequences_50_qiime2.qza\
+  --p-where "length(sequence) > 49"
+
+qiime feature-table filter-seqs\
+  --m-metadata-file dada2_single-end-demux-standalone.qza/representative_sequences.qza\
+  --i-data dada2_single-end-demux-standalone.qza/representative_sequences.qza\
+  --o-filtered-data representative_sequences_50_standalone.qza\
+  --p-where "length(sequence) > 49"
+
+```
+
+- Filter table based on seqs
+
+```{bash, eval=FALSE}
+qiime feature-table filter-features\
+  --i-table dada2_single-end-demux-qiime2.qza/table.qza\
+  --m-metadata-file representative_sequences_50_qiime2.qza\
+  --o-filtered-table table_50_qiime2.qza
+
+qiime feature-table filter-features\
+  --i-table dada2_single-end-demux-standalone.qza/table.qza\
+  --m-metadata-file representative_sequences_50_standalone.qza\
+  --o-filtered-table table_50_standalone.qza
+```
+
+
+
+
+
+## 3. OTU's APPROACH
+
+For qiime2 data, we have to export and run:
+
+```
+for i in *.fastq.gz; do reformat in=$i out=clean_$i minconsecutivebases=1; done
+```
+
+Then import again and run all again. This is due to an error of ITSxpress that generates sequences with 0 lentgh. The next steps will be run for the standalone and qiime2 data to custer in order to cluster to OTUS.
+
+
+- Filter by q-score
+
+```
+for i in *;do  qiime quality-filter q-score --i-demux $i --output-dir filterqscore_$i; done
+
+```
+
+- Derreplication
+
+```
+for i in filterqscore_*; do qiime vsearch dereplicate-sequences --i-sequences $i/filtered_sequences.qza --output-dir derep_$i;done
+```
+
+
+- Clustering *de novo*
+
+```
+for i in derep_* ; do qiime vsearch cluster-features-de-novo --i-sequences $i/dereplicated_sequences.qza --i-table $i/dereplicated_table.qza --p-perc-identity 0.97 --p-threads 4 --output-dir cluster97_$i; done
+```
+
+- Chimera checking and filter from table
+
+```
+for i in cluster97_*; do qiime vsearch uchime-denovo --i-sequences $i/clustered_sequences.qza --i-table $i/clustered_table.qza --output-dir chimera97_$i;done
+
+```
+
+```
+qiime feature-table filter-features\
+  --i-table cluster97_derep_filterqscore_single-end-demux-qiime2-reformat.qza/clustered_table.qza\
+  --m-metadata-file chimera97_cluster_derep_filterqscore_single-end-demux-qiime2-reformat.qza/nonchimeras.qza  \
+  --o-filtered-table chimera97_cluster_derep_filterqscore_single-end-demux-qiime2-reformat.qza/table97-nonchimeras-qiime2.qza
+
+```
+
+```
+qiime feature-table filter-features\
+--i-table cluster97_derep_filterqscore_single-end-demux-standalone.qza/clustered_table.qza\
+--m-metadata-file chimera97_cluster_derep_filterqscore_single-end-demux-standalone.qza/nonchimeras.qza  --o-filtered-table chimera97_cluster_derep_filterqscore_single-end-demux-standalone.qza/table97-nonchimeras-standalone.qza
+```
+
+
+
+**Filtering singletons from table and seqs** (voy por aquí)
+
+```
+ for i in chimera* ; do qiime feature-table filter-features --i-table $i/table*.qza --p-min-frequency 2 --o-filtered-table $i/filtered_$i ; done
+ ```
+ 
+``` 
+for i in chimera*/; do
+    data_file=$(find $i -name 'nonchimeras*' -type f)
+    table_file=$(find $i -name 'filtered-table*' -type f)
+
+    qiime feature-table filter-seqs \
+        --i-data $data_file \
+        --i-table $table_file \
+        --o-filtered-data ${data_file%.qza}-filtered.qza
+done
+
+```
+
+
+
+
+## 4. RESULTS FROM DIFFERENT METHODS
+
+**4.1. Results from trimmming and clustering (asv's and otus approach)**
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+
+#loading files and package to summarize
+library(tidyverse)
+library(qiime2R)
+library(plyr)
+library(RColorBrewer)
+
+
+#loadding tables to summarice
+trimmed_table<- data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed/demux_lib/no_cluster/table_trimmed_paired.qza")$data), check.names = F )
+trimmed_clustered_table<-data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed/demux_lib/cluster/table_clustered.qza")$data), check.names = F) 
+
+trimmed_discard_table<- data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed_discard/demux_lib/tables/table_trimmed_paired_discard.qza")$data) , check.names = F )
+trimmed_discard_clustered_table<-data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed_discard/demux_lib/clustered/table_clustered_disc.qza")$data) , check.names = F )
+
+trimmed_comple_table<-  data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed_complementarios/no_clustered/table_complementarios.qza")$data)  , check.names = F )
+trimmed_comple_clustered_table<-data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed_complementarios/clustered/table_clustered_comple.qza")$data)  , check.names = F )
+
+trimmed_comple_discard_table<-data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed_complementarios_discard/no_clustered/table_complementarios_discard.qza")$data), check.names = F )
+trimmed_comple_discard_clustered_table<-data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed_complementarios_discard/clustered/table_clustered_comple_disc.qza")$data ), check.names = F )
+
+otus_table<- data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed/demux_lib/otus_strategy/table_otus_filter_singletons.qza")$data) , check.names = F )
+
+
+
+#loading files to summarize
+#these files were obtained in qiime2 (e.g for trimmed table "qiime tools export --input-path table_trimmed.qzv --output-path trimmed")
+
+trimmed<- read_csv("../COI/TRIMMED/demux_trimmed/demux_lib/no_cluster/trimmed/feature-frequency-detail.csv")%>% dplyr::select(-X1, frequency=`0`)
+trimmed_clustered<- read_csv("../COI/TRIMMED/demux_trimmed/demux_lib/cluster/trimmed_clustered/feature-frequency-detail.csv") %>% dplyr::select(-X1, frequency=`0`)
+
+trimmed_discard<- read_csv("../COI/TRIMMED/demux_trimmed_discard/demux_lib/no_clustered/trimmed_discard/feature-frequency-detail.csv")%>% dplyr::select(-X1, frequency=`0`)
+trimmed_discard_clustered<-read_csv("../COI/TRIMMED/demux_trimmed_discard/demux_lib/clustered/trimmed_discard_clustered/feature-frequency-detail.csv")%>% dplyr::select(-X1, frequency=`0`)
+
+trimmed_comple<- read_csv("../COI/TRIMMED/demux_trimmed_complementarios/no_clustered/trimmed_complementarios/feature-frequency-detail.csv")%>% dplyr::select(-X1, frequency=`0`)
+trimmed_comple_clustered<- read_csv("../COI/TRIMMED/demux_trimmed_complementarios/clustered/trimmed_clustered_complementarios/feature-frequency-detail.csv")%>% dplyr::select(-X1, frequency=`0`)
+
+trimmed_comple_discard<- read_csv("../COI/TRIMMED/demux_trimmed_complementarios_discard/no_clustered/trimmed_comple_discard/feature-frequency-detail.csv")%>% dplyr::select(-X1, frequency=`0`)
+trimmed_comple_discard_clustered<-read_csv("../COI/TRIMMED/demux_trimmed_complementarios_discard/clustered/trimmed_comple_discad/feature-frequency-detail.csv")%>% dplyr::select(-X1, frequency=`0`)
+
+otus<-read_csv("../COI/TRIMMED/demux_trimmed/demux_lib/otus_strategy/otus/feature-frequency-detail.csv")%>% dplyr::select(-X1, frequency=`0`)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+
+#Let's summarice the uniques features (e.g, features that are in just one sample)
+
+tables_all<- list(trimmed_table, trimmed_clustered_table, trimmed_discard_table, trimmed_discard_clustered_table,trimmed_comple_table, trimmed_comple_clustered_table, trimmed_comple_discard_table, trimmed_comple_discard_clustered_table,otus_table)
+
+
+nonzero <- function(x) sum(x != 0)
+count_nonzero<-function(y) {numcolwise(nonzero)(y) %>% t() %>% as.data.frame() %>% filter(V1 == 1)%>% nrow()}
+
+tables_uniques<- lapply(tables_all, count_nonzero)
+
+names_rows_uniques<- c("trimmed", "trimmed_clustered", "trimmed_discard", "trimmed_discard_clustered", "trimmed_comple", "trimmed_comple_clustered", "trimmed_comple_discard", "trimmed_comple_discard_clustered", "otus")
+
+
+table_summaricing_uniques  <-  as.data.frame(matrix(unlist(tables_uniques), nrow=9)) %>%dplyr::select("Features just one sample" = "V1")
+rownames(table_summaricing_uniques)<- names_rows_uniques
+
+  
+```
+
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+#let's summarice the total of features and counts in each method
+library(kableExtra)
+tables_sum<- list(trimmed, trimmed_clustered, trimmed_discard, trimmed_discard_clustered,
+                  trimmed_comple, trimmed_comple_clustered, trimmed_comple_discard, 
+                  trimmed_comple_discard_clustered,otus)
+
+
+names_rows<- c("trimmed", "trimmed_clustered", "trimmed_discard", "trimmed_discard_clustered", "trimmed_comple", "trimmed_comple_clustered", "trimmed_comple_discard", "trimmed_comple_discard_clustered", "otus")
+
+summarice_freq <- function(x){
+  list(colSums(x),nrow(x))
+}
+summaricing_freq<-sapply(tables_sum, summarice_freq )
+dd  <-  as.data.frame(matrix(unlist(summaricing_freq), nrow=2)) 
+table_summaricing<-dd %>% t() %>% as.data.frame() %>% dplyr::rename( "Total frequency" = "V1", "Number of features"="V2")
+rownames(table_summaricing)<- names_rows
+
+table_sum<- cbind(table_summaricing, table_summaricing_uniques)
+
+
+kbl(table_sum) %>% kable_paper(bootstrap_options = "striped", full_width = F, position = "center")
+
+```
+
+
+
+**4.2. PCA plots**
+
+
+```{r, warning=FALSE, message=FALSE, message=FALSE, eval=FALSE}
+
+# load the required R packages and files 
+require(compositions) 
+require(zCompositions)
+library(CoDaSeq)
+
+metadata<-read_tsv("../COI/MAPPINGS/merge_mapping.txt")
+
+metadata$Ecosystems<- factor(metadata$Ecosystem,
+                         levels = c( "Bosque", "Cultivo", "PA"),
+                         labels = c("Forest", "Cultivation" ,"PA"))
+metadata$sampleid<- as.character(metadata$sampleid)
+
+#setting functions 
+zero_transform<- function(x){data.frame(t(cmultRepl(t(x), method="CZM", output="p-counts")), check.names = F)}
+d.clr.abund.codaseq<-function(x){data.frame(codaSeq.clr(x,samples.by.row = F), check.names = F)}
+pcx.abunda <- function(x){prcomp((x))}
+
+#applying functions
+zero_tables<- lapply(tables_all, zero_transform)
+d.clr.abund<- lapply(zero_tables, d.clr.abund.codaseq)
+pcx.abund<- lapply(d.clr.abund, pcx.abunda)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE,  fig.show="hold", out.width="50%", message=FALSE, eval=FALSE}
+
+#create the base plot with only the arrows
+  PC1.f<- function(x,y){paste("PC1", round(sum(x$sdev[1] ^ 2) / mvar(y) * 100, 1), "%")}
+  PC2.f <- function(x,y){paste("PC2", round(sum(x$sdev[2] ^ 2) / mvar(y) * 100, 1), "%")}
+  
+  
+  PC1_all<- mapply(PC1.f, pcx.abund, d.clr.abund)
+  PC2_all<- mapply(PC2.f, pcx.abund, d.clr.abund)
+  
+  pca_tables<- function(tab){ggplot() +
+   # theme_q2r() +
+    #xlab(PC1) +
+    #ylab(PC2) +
+   geom_segment(data=data.frame(tab$rotation) %>%   #arrows
+                   rownames_to_column(var = "FeatureID")%>%  
+                   mutate(a=sqrt(PC1^2+PC2^2)) %>% # calculate the distance from the origin
+                   top_n(15, a) %>% #keep 10 furthest away points
+                   mutate(PC1=PC1*800, PC2=PC2*800),
+                   aes(x=0, xend=PC1, y=0, yend=PC2),
+                   arrow = arrow(length = unit(0.3,"cm")))+
+    geom_point(data=data.frame(tab$x) %>% #individuals
+                   rownames_to_column(var = "sampleid")%>%
+                   left_join(metadata, by = "sampleid"),
+                   aes(x=PC1, y=PC2, fill=Ecosystems),shape=21, size=4) +
+                   geom_vline(xintercept = 0, linetype = 2) +   #lines-cross
+                   geom_hline(yintercept = 0, linetype = 2) +
+                  #scale_fill_manual(values = c("#212F3D","#839192"))#color of points 
+     theme(axis.text = element_text(colour = "black", size = 12),
+                   axis.title = element_text(colour = "black", size = 12),
+                   legend.text = element_text(size = 10),
+                   legend.title = element_text(size = 12), 
+                   legend.position = "right", 
+                   legend.box = "vertical") }
+  
+  
+  
+  
+  figures_pca<- lapply(pcx.abund, pca_tables)
+  
+  pca_trimmed<- figures_pca[[1]]+ xlab(PC1_all[[1]]) +ylab(PC2_all[[1]]) + ggtitle("trimmed")
+  pca_trimmed_clustered<- figures_pca[[2]]+ xlab(PC1_all[[2]]) +ylab(PC2_all[[2]]) + ggtitle("trimmed clustered")
+pca_trimmed_discard<- figures_pca[[3]]+ xlab(PC1_all[[3]]) +ylab(PC2_all[[3]]) + ggtitle("trimmed discard")
+pca_trimmed_discard_clustered<- figures_pca[[4]]+ xlab(PC1_all[[4]]) +ylab(PC2_all[[4]]) + ggtitle("trimmed discard clustered")
+pca_trimmed_comple<- figures_pca[[5]]+ xlab(PC1_all[[5]]) +ylab(PC2_all[[5]]) + ggtitle("trimmed complementaries")
+pca_trimmed_comple_clustered<- figures_pca[[6]]+ xlab(PC1_all[[6]]) +ylab(PC2_all[[6]]) + ggtitle("trimmed complementaries clustered")
+pca_trimmed_comple_discard<- figures_pca[[7]]+ xlab(PC1_all[[7]]) +ylab(PC2_all[[7]]) + ggtitle("trimmed complementaries discard")
+pca_trimmed_ccomple_discard_clustered<- figures_pca[[8]]+ xlab(PC1_all[[8]]) +ylab(PC2_all[[8]]) + ggtitle("trimmed complementaries discard clustered")
+pca_otus<- figures_pca[[9]]+ xlab(PC1_all[[9]]) +ylab(PC2_all[[9]]) + ggtitle("otus approach")
+
+pca_trimmed;pca_trimmed_clustered; pca_trimmed_discard; pca_trimmed_discard_clustered; pca_trimmed_comple; pca_trimmed_comple_clustered; pca_trimmed_comple_discard; pca_trimmed_ccomple_discard_clustered;pca_otus
+
+```
+
+**4.3. Colapsing to Genus**
+
+```{r, warning=FALSE, message=FALSE, fig.show="hold", out.width="50%", message=FALSE, eval=FALSE}
+
+#I chose trimmed clustered, no-clustered and otus approach
+
+table_genus_clustered<- data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed/demux_lib/cluster/table_level7.qza")$data) , check.names = F )
+table_genus_no_clustered<- data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed/demux_lib/no_cluster//table_level7_noclustered.qza")$data) , check.names = F )
+table_genus_otus<- data.frame(t(read_qza("../COI/clustered_data/table_otus_level7.qza")$data) , check.names = F )
+
+
+metadata<-read_tsv("../COI/MAPPINGS/merge_mapping.txt")
+
+metadata$Ecosystems<- factor(metadata$Ecosystem,
+                             levels = c( "Bosque", "Cultivo", "PA"),
+                             labels = c("Forest", "Cultivation" ,"PA"))
+metadata$sampleid<- as.character(metadata$sampleid)
+
+
+
+#We use the same functions we used before (for PCA's)
+tables_all2<- list(table_genus_clustered, table_genus_no_clustered, table_genus_otus)
+
+zero_tables<- lapply(tables_all2, zero_transform)
+d.clr.abund<- lapply(zero_tables, d.clr.abund.codaseq)
+pcx.abund<- lapply(d.clr.abund, pcx.abunda)
+
+
+PC1_all<- mapply(PC1.f, pcx.abund, d.clr.abund)
+PC2_all<- mapply(PC2.f, pcx.abund, d.clr.abund)
+
+pca_tables<- function(tab){ggplot() +
+    # theme_q2r() +
+    #xlab(PC1) +
+    #ylab(PC2) +
+    geom_segment(data=data.frame(tab$rotation) %>%   #arrows
+                   rownames_to_column(var = "FeatureID")%>%  
+                   mutate(a=sqrt(PC1^2+PC2^2)) %>% # calculate the distance from the origin
+                   top_n(15, a) %>% #keep 10 furthest away points
+                   mutate(PC1=PC1*10, PC2=PC2*10),
+                 aes(x=0, xend=PC1, y=0, yend=PC2),
+                 arrow = arrow(length = unit(0.3,"cm")))+
+    geom_point(data=data.frame(tab$x) %>% #individuals
+                 rownames_to_column(var = "sampleid")%>%
+                 left_join(metadata, by = "sampleid"),
+               aes(x=PC1, y=PC2, color=Altitud, shape= Ecosystems), size=4) +
+    scale_color_viridis_c()+
+    geom_vline(xintercept = 0, linetype = 2) +   #lines-cross
+    geom_hline(yintercept = 0, linetype = 2) +
+    #scale_fill_manual(values = c("#212F3D","#839192"))#color of points 
+    theme(axis.text = element_text(colour = "black", size = 12),
+          axis.title = element_text(colour = "black", size = 12),
+          legend.text = element_text(size = 10),
+          legend.title = element_text(size = 12), 
+          legend.position = "right", 
+          legend.box = "vertical") }
+
+
+
+
+figures_pca<- lapply(pcx.abund, pca_tables)
+
+pca_genus_clustered<- figures_pca[[1]]+ xlab(PC1_all[[1]]) +ylab(PC2_all[[1]]) + ggtitle("clustered")
+pca_genus_noclustered<- figures_pca[[2]]+ xlab(PC1_all[[2]]) +ylab(PC2_all[[2]]) + ggtitle("no clustered")
+pca_genus_otus<- figures_pca[[3]]+ xlab(PC1_all[[3]]) +ylab(PC2_all[[3]]) + ggtitle("otus")
+
+pca_genus_clustered; pca_genus_noclustered;pca_genus_otus
+
+```
+
+**4.4.Choosing a taxa to cluster**
+
+```{r, eval=FALSE}
+
+table_phylum_clustered<- data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed/demux_lib/cluster/table_level2_clustered.qza")$data) , check.names = F )
+table_phylum_no_clustered<- data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed/demux_lib/no_cluster//table_level2_noclustered.qza")$data) , check.names = F )
+table_phylum_otus<- data.frame(t(read_qza("../COI/clustered_data/table_otus_level2.qza")$data) , check.names = F )
+
+table_phylum_clustered_gather<- table_phylum_clustered %>%   gather(key = "taxa", value = "clustered")%>% group_by(taxa) %>% summarise_if(is.numeric, sum) 
+
+table_phylum_no_clustered_gather<- table_phylum_no_clustered %>%   gather(key = "taxa", value = "no_clustered")%>% group_by(taxa) %>% summarise_if(is.numeric, sum) 
+
+table_phylum_otus_gather<- table_phylum_otus %>%   gather(key = "taxa", value = "otus")%>% group_by(taxa) %>% summarise_if(is.numeric, sum) 
+
+tables_phylum<- table_phylum_clustered_gather %>% full_join(table_phylum_no_clustered_gather, by = "taxa") %>% full_join(table_phylum_otus_gather, by = "taxa")%>% replace(is.na(.), 0)
+
+
+  
+  tables_phylum %>% gather(-taxa, key = "ids", value = "counts") %>% ggplot(aes(ids, counts, fill=taxa)) +
+  geom_bar( stat = "identity", position = "fill") +
+  scale_fill_manual(name = "Taxa",
+                    values = c(brewer.pal(12, "Paired")[1:12],
+                               brewer.pal(8, "Set2")[1:8], brewer.pal(12, "Paired")[1:12]))
+
+```
+
+
+```
+As we see the major percentage are assigned to Arthropoa phylum
+
+```
+**4.5. Arthropoda tables**
+
+```{r, warning=FALSE, message=FALSE,fig.show="hold", out.width="50%", message=FALSE, eval=FALSE}
+#Tables filter to just keep Arthropoda phylum using qiime2 
+
+table_arthropoda_clustered<-data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed/demux_lib/cluster/table_arthropoda.qza")$data) , check.names = F )
+table_arthropoda_no_clustered<- data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed/demux_lib/no_cluster/table_arthropoda.qza")$data) , check.names = F )
+table_arthropoda_otus<- data.frame(t(read_qza("../COI/clustered_data/table_arthropoda.qza")$data) , check.names = F )
+
+table_arthropoda_clustered_genus<-data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed/demux_lib/cluster/table_level7_clustered_arto.qza")$data) , check.names = F )
+table_arthropoda_no_clustered_genus<- data.frame(t(read_qza("../COI/TRIMMED/demux_trimmed/demux_lib/no_cluster/table_level7_clustered_arto.qza")$data) , check.names = F )
+table_arthropoda_otus_genus<- data.frame(t(read_qza("../COI/clustered_data/table_otus_level7_arto.qza")$data) , check.names = F )
+
+tables_all3<- list(table_arthropoda_clustered, table_arthropoda_no_clustered, 
+                   table_arthropoda_otus,table_arthropoda_clustered_genus,
+                   table_arthropoda_no_clustered_genus, table_arthropoda_otus_genus)
+
+
+zero_tables<- lapply(tables_all3, zero_transform)
+d.clr.abund<- lapply(zero_tables, d.clr.abund.codaseq)
+pcx.abund<- lapply(d.clr.abund, pcx.abunda)
+
+PC1_all<- mapply(PC1.f, pcx.abund, d.clr.abund)
+PC2_all<- mapply(PC2.f, pcx.abund, d.clr.abund)
+
+pca_tables<- function(tab){ggplot() +
+    # theme_q2r() +
+    #xlab(PC1) +
+    #ylab(PC2) +
+    geom_segment(data=data.frame(tab$rotation) %>%   #arrows
+                   rownames_to_column(var = "FeatureID")%>%  
+                   mutate(a=sqrt(PC1^2+PC2^2)) %>% # calculate the distance from the origin
+                   top_n(15, a) %>% #keep 10 furthest away points
+                   mutate(PC1=PC1*10, PC2=PC2*10),
+                 aes(x=0, xend=PC1, y=0, yend=PC2),
+                 arrow = arrow(length = unit(0.3,"cm")))+
+    geom_point(data=data.frame(tab$x) %>% #individuals
+                 rownames_to_column(var = "sampleid")%>%
+                 left_join(metadata, by = "sampleid"),
+               aes(x=PC1, y=PC2, color=Altitud, shape= Ecosystems), size=4) +
+    scale_color_viridis_c(option = "plasma")+
+    geom_vline(xintercept = 0, linetype = 2) +   #lines-cross
+    geom_hline(yintercept = 0, linetype = 2) +
+    #scale_fill_manual(values = c("#212F3D","#839192"))#color of points 
+    theme(axis.text = element_text(colour = "black", size = 12),
+          axis.title = element_text(colour = "black", size = 12),
+          legend.text = element_text(size = 10),
+          legend.title = element_text(size = 12), 
+          legend.position = "right", 
+          legend.box = "vertical") }
+
+  
+figures_pca<- lapply(pcx.abund, pca_tables)
+
+pca_clustered_arto<- figures_pca[[1]]+ xlab(PC1_all[[1]]) +ylab(PC2_all[[1]]) + ggtitle("clustered")
+pca_noclustered_arto<- figures_pca[[2]]+ xlab(PC1_all[[2]]) +ylab(PC2_all[[2]]) + ggtitle("no clustered")
+pca_otus_arto<- figures_pca[[3]]+ xlab(PC1_all[[3]]) +ylab(PC2_all[[3]]) + ggtitle("otus")
+
+pca_genus_clustered_arto<- figures_pca[[4]]+ xlab(PC1_all[[4]]) +ylab(PC2_all[[4]]) + ggtitle("clustered_genus")
+pca_genus_noclustered_arto<- figures_pca[[5]]+ xlab(PC1_all[[5]]) +ylab(PC2_all[[5]]) + ggtitle("no clustered_genus")
+pca_genus_otus_arto<- figures_pca[[6]]+ xlab(PC1_all[[6]]) +ylab(PC2_all[[6]]) + ggtitle("otus_genus")
+
+pca_clustered_arto; pca_noclustered_arto; pca_otus_arto; pca_genus_clustered_arto; pca_genus_noclustered_arto;pca_genus_otus_arto
+
+
+```
+
+**4.5.Collapsing to Genus but with allbolDB taxonomy**
+
+```{r, warning=FALSE, message=FALSE,  fig.show="hold", out.width="50%", message=FALSE, eval=FALSE}
+
+#allboldDB taxonomy is set to focus more in Arthropoda animalia taxa
+
+table_allbold_clustered_genus<-data.frame(t(read_qza("../COI/clustered_data/table_clustered_level7_allbold.qza")$data) , check.names = F )
+table_allbold_no_clustered_genus<- data.frame(t(read_qza("../COI/cluster_data_no/table_noclustered_level7_allbold.qza")$data) , check.names = F )
+table_allbold_otus_genus<- data.frame(t(read_qza("../COI/clustered_data/table_otus_level7_allbold.qza")$data) , check.names = F )
+
+tables_all4<- list(table_allbold_clustered_genus, table_allbold_no_clustered_genus, table_allbold_otus_genus)
+
+
+zero_tables<- lapply(tables_all4, zero_transform)
+d.clr.abund<- lapply(zero_tables, d.clr.abund.codaseq)
+pcx.abund<- lapply(d.clr.abund, pcx.abunda)
+
+PC1_all<- mapply(PC1.f, pcx.abund, d.clr.abund)
+PC2_all<- mapply(PC2.f, pcx.abund, d.clr.abund)
+
+pca_tables<- function(tab){ggplot() +
+    # theme_q2r() +
+    #xlab(PC1) +
+    #ylab(PC2) +
+    geom_segment(data=data.frame(tab$rotation) %>%   #arrows
+                   rownames_to_column(var = "FeatureID")%>%  
+                   mutate(a=sqrt(PC1^2+PC2^2)) %>% # calculate the distance from the origin
+                   top_n(15, a) %>% #keep 10 furthest away points
+                   mutate(PC1=PC1*10, PC2=PC2*10),
+                 aes(x=0, xend=PC1, y=0, yend=PC2),
+                 arrow = arrow(length = unit(0.3,"cm")))+
+    geom_point(data=data.frame(tab$x) %>% #individuals
+                 rownames_to_column(var = "sampleid")%>%
+                 left_join(metadata, by = "sampleid"),
+               aes(x=PC1, y=PC2, color=Altitud, shape= Ecosystems), size=4) +
+    scale_color_viridis_c(option = "inferno")+
+    geom_vline(xintercept = 0, linetype = 2) +   #lines-cross
+    geom_hline(yintercept = 0, linetype = 2) +
+    #scale_fill_manual(values = c("#212F3D","#839192"))#color of points 
+    theme(axis.text = element_text(colour = "black", size = 12),
+          axis.title = element_text(colour = "black", size = 12),
+          legend.text = element_text(size = 10),
+          legend.title = element_text(size = 12), 
+          legend.position = "right", 
+          legend.box = "vertical") }
+
+  
+figures_pca<- lapply(pcx.abund, pca_tables)
+
+pca_clustered_allbold<- figures_pca[[1]]+ xlab(PC1_all[[1]]) +ylab(PC2_all[[1]]) + ggtitle("clustered")
+pca_noclustered_allbold<- figures_pca[[2]]+ xlab(PC1_all[[2]]) +ylab(PC2_all[[2]]) + ggtitle("no clustered")
+pca_otus_allbold<- figures_pca[[3]]+ xlab(PC1_all[[3]]) +ylab(PC2_all[[3]]) + ggtitle("otus")
+
+pca_clustered_allbold; pca_noclustered_allbold; pca_otus_allbold
+
+
+```
+
+
