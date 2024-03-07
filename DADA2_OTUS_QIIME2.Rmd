@@ -1,0 +1,147 @@
+---
+title: "DADA2 AND OTUS IN QIIME2"
+author: "Steph"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    theme: readable
+    highlight: tango
+    toc: true
+    toc_depth: 2
+    toc_float: true
+---
+
+# DADA2 AND OTUS IN QIIME2
+
+## IMPORTING STANDALONE DATA
+
+```
+qiime tools import\
+  --type 'SampleData[SequencesWithQuality]'\
+  --input-path manifest.txt\
+  --output-path single-end-demux-standalone.qza\
+  --input-format SingleEndFastqManifestPhred33V2
+```
+
+## DADA2 FOR MERGED SEQUENCES
+
+- Run DADA2 on the two data-sets. 
+
+```
+ for i in *; do qiime dada2 denoise-single --i-demultiplexed-seqs $i --p-trunc-len 0 --p-n-threads 4 --output-dir dada2_$i; done
+```
+
+- Filter seqs by length (>50bp)
+
+```{bash, eval=FALSE}
+qiime feature-table filter-seqs\
+  --m-metadata-file dada2_single-end-demux-qiime2.qza/representative_sequences.qza\
+  --i-data dada2_single-end-demux-qiime2.qza/representative_sequences.qza\
+  --o-filtered-data representative_sequences_50_qiime2.qza\
+  --p-where "length(sequence) > 49"
+
+qiime feature-table filter-seqs\
+  --m-metadata-file dada2_single-end-demux-standalone.qza/representative_sequences.qza\
+  --i-data dada2_single-end-demux-standalone.qza/representative_sequences.qza\
+  --o-filtered-data representative_sequences_50_standalone.qza\
+  --p-where "length(sequence) > 49"
+
+```
+
+- Filter table based on seqs
+
+```{bash, eval=FALSE}
+qiime feature-table filter-features\
+  --i-table dada2_single-end-demux-qiime2.qza/table.qza\
+  --m-metadata-file representative_sequences_50_qiime2.qza\
+  --o-filtered-table table_50_qiime2.qza
+
+qiime feature-table filter-features\
+  --i-table dada2_single-end-demux-standalone.qza/table.qza\
+  --m-metadata-file representative_sequences_50_standalone.qza\
+  --o-filtered-table table_50_standalone.qza
+```
+
+
+## DADA2 FOR UNMERGED SEQUENCES
+
+```
+ qiime dada2 denoise-paired --i-demultiplexed-seqs paired-end-demux.qza  --p-trunc-len-f 0 --p-trunc-len-r 0 --p-n-threads 4 --output-dir dada2_paired
+```
+
+Filter by length not neccesary because min length was 231.
+
+
+## OTU's FOR MERGED SEQUENCES
+
+For qiime2-itsxpress data, we have to export and run:
+
+```
+for i in *.fastq.gz; do reformat in=$i out=clean_$i minconsecutivebases=1; done
+```
+This script is from (BBMap)[https://github.com/BioInfoTools/BBMap/blob/master/sh/reformat.sh]
+
+Then import again and run all. This is due to an error of ITSxpress that generates sequences with 0 lentgh. The next steps will be run for the standalone and qiime2 data in order to cluster to OTUS.
+
+
+- Filter by q-score
+
+```
+for i in *;do  qiime quality-filter q-score --i-demux $i --output-dir filterqscore_$i; done
+
+```
+
+- Derreplication
+
+```
+for i in filterqscore_*; do qiime vsearch dereplicate-sequences --i-sequences $i/filtered_sequences.qza --output-dir derep_$i;done
+```
+
+
+- Clustering *de novo*
+
+```
+for i in derep_* ; do qiime vsearch cluster-features-de-novo --i-sequences $i/dereplicated_sequences.qza --i-table $i/dereplicated_table.qza --p-perc-identity 0.97 --p-threads 4 --output-dir cluster97_$i; done
+```
+
+- Chimera checking and filter from table
+
+```
+for i in cluster97_*; do qiime vsearch uchime-denovo --i-sequences $i/clustered_sequences.qza --i-table $i/clustered_table.qza --output-dir chimera97_$i;done
+
+```
+
+```
+qiime feature-table filter-features\
+  --i-table cluster97_derep_filterqscore_single-end-demux-qiime2-reformat.qza/clustered_table.qza\
+  --m-metadata-file chimera97_cluster_derep_filterqscore_single-end-demux-qiime2-reformat.qza/nonchimeras.qza  \
+  --o-filtered-table chimera97_cluster_derep_filterqscore_single-end-demux-qiime2-reformat.qza/table97-nonchimeras-qiime2.qza
+
+```
+
+```
+qiime feature-table filter-features\
+--i-table cluster97_derep_filterqscore_single-end-demux-standalone.qza/clustered_table.qza\
+--m-metadata-file chimera97_cluster_derep_filterqscore_single-end-demux-standalone.qza/nonchimeras.qza  --o-filtered-table chimera97_cluster_derep_filterqscore_single-end-demux-standalone.qza/table97-nonchimeras-standalone.qza
+```
+
+
+
+- Filtering singletons from table and seqs (optional)
+
+```
+ for i in chimera* ; do qiime feature-table filter-features --i-table $i/table*.qza --p-min-frequency 2 --o-filtered-table $i/filtered_$i ; done
+ ```
+ 
+``` 
+for i in chimera*/; do
+    data_file=$(find $i -name 'nonchimeras*' -type f)
+    table_file=$(find $i -name 'filtered-table*' -type f)
+
+    qiime feature-table filter-seqs \
+        --i-data $data_file \
+        --i-table $table_file \
+        --o-filtered-data ${data_file%.qza}-filtered.qza
+done
+
+```

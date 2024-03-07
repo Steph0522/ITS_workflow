@@ -1,0 +1,110 @@
+---
+title: "ITS WORKFLOW - PREPROCESSING"
+author: "Steph"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    theme: readable
+    highlight: tango
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+# PREPROCESSING SEQUENCES
+
+
+#### **Script to process ITS sequences from LMNP and IPNP**
+
+
+## IMPORTING AND DEMULTIPLEXING SEQUENCES
+
+
+### IMPORTING TO QIIME2
+
+- Make directories for each library
+
+```
+mkdir ITS1
+mkdir ITS2
+mkdir ITS3
+mkdir ITS4
+mkdir ITS5
+mkdir ITS6
+mkdir ITS7
+mkdir ITS8
+mkdir ITS9
+
+```
+
+- Loop to rename forward seqs
+
+```
+for i in ITS* ;do mv ITS*/ITS_*1.fastq.gz  ITS*/forward.fastq.gz ; done
+```
+
+- Loop to rename reverse seqs
+
+```
+for i in ITS* ;do mv ITS*/ITS_*2.fastq.gz  ITS*/reverse.fastq.gz ; done
+```
+
+- Loop to import files to QIIME2
+
+```
+for i in ITS*; do qiime tools import --type MultiplexedPairedEndBarcodeInSequence --input-path $i --output-path $i.qza ; done
+
+```
+### DEMULTIPLEXING WITH CUTADAPT
+
+```
+qiime cutadapt demux-paired\
+  --i-seqs its1.qza\
+  --m-forward-barcodes-file ../../maps_its/its1.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its1_demux
+
+qiime cutadapt demux-paired\
+  --i-seqs its2.qza\
+  --m-forward-barcodes-file ../../maps_its/its2.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its2_demux
+
+qiime cutadapt demux-paired\
+  --i-seqs its3.qza\
+  --m-forward-barcodes-file ../../maps_its/its3.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its3_demux
+
+qiime cutadapt demux-paired\
+  --i-seqs its4.qza --m-forward-barcodes-file ../../maps_its/its4.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its4_demux
+
+qiime cutadapt demux-paired  --i-seqs its5.qza\
+  --m-forward-barcodes-file ../../maps_its/its5.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its5_demux
+
+qiime cutadapt demux-paired  --i-seqs its6.qza\
+  --m-forward-barcodes-file ../../maps_its/its6.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its6_demux
+
+qiime cutadapt demux-paired  --i-seqs its7.qza\
+  --m-forward-barcodes-file ../../maps_its/its7.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its7_demux
+
+qiime cutadapt demux-paired\
+  --i-seqs its8.qza\
+  --m-forward-barcodes-file ../../maps_its/its8.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its8_demux
+
+qiime cutadapt demux-paired\
+  --i-seqs its9.qza\
+  --m-forward-barcodes-file ../../maps_its/its9.txt\
+  --m-forward-barcodes-column BarcodeSequence\
+  --output-dir its9_demux
+
+```

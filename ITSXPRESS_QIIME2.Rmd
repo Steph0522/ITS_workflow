@@ -1,0 +1,55 @@
+---
+title: "ITS WORKFLOW-QIIME2"
+author: "Steph"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    theme: readable
+    highlight: tango
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+
+# ITSXPRESS QIIME2
+
+## OPTION 1: MERGED SEQUENCES
+
+- Running itsxpress 
+
+```
+for i in its*_demux ; do qiime itsxpress trim-pair --i-per-sample-sequences $i/per_sample_sequences.qza --p-region ITS2 --p-taxa F --o-trimmed itsxpress_2024_$i;done
+```
+
+- Export sequences
+
+```
+for i in itsxpress_2024_its*; do qiime tools export --input-path $i --output-path exported; done
+```
+
+- Import sequences together
+```
+qiime tools import  --type 'SampleData[SequencesWithQuality]'  --input-path manifest.txt  --output-path single-end-demux-qiime2.qza  --input-format SingleEndFastqManifestPhred33V2
+```
+
+## OPTION 2: UNMERGED SEQUENCES
+
+- Running itsxpress
+
+```
+for i in its*_demux ; do qiime itsxpress trim-pair-output-unmerged --i-per-sample-sequences $i/per_sample_sequences.qza --p-region ITS2 --p-taxa F --o-trimmed itsxpress_2024_unmerged$i;done
+```
+- Export sequences
+```
+for i in itsxpress_2024_unmerged*; do qiime tools export --input-path $i --output-path exported_$i; done
+```
+
+- Import sequences together
+```
+ qiime tools import   --type 'SampleData[PairedEndSequencesWithQuality]'   --input-path manifest.txt   --output-path paired-end-demux.qza   --input-format PairedEndFastqManifestPhred33V2
+```
+
+
+
+

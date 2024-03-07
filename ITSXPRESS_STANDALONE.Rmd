@@ -11,15 +11,18 @@ output:
     toc_float: true
 ---
 
-# ITS WORKFLOW-STANDALONE
+# ITSXPRESS STANDALONE
 
-## 1. ITSXPRESS STANDALONE
+#### EXPORTING DATA
 
-```{bash, eval=FALSE}
-conda activate ITSxpress
+```
+for i in its*_demux; do qiime tools export  --input-path  $i/per_sample_sequences.qza --output-path  exported_$i; done
 ```
 
-- Se mueve todo a una sola carpeta y se corre este script de bash:
+
+## OPTION 1 : MERGED SEQUENCES
+
+- Move all data to one directory and run this bash script (*chatGPT*):
 
 ```{bash, eval=FALSE}
 
@@ -45,7 +48,10 @@ for forward_file in *_R1_001.fastq.gz; do
 done
 ```
 
-- Unmerged
+## OPTION 2 : UNMERGED SEQUENCES
+
+
+- Move all data to one directory and run this bash script (*chatGPT*):
 ```{bash, eval=FALSE}
 
 #!/bin/bash
@@ -68,234 +74,5 @@ for forward_file in *_R1_001.fastq.gz; do
     # Optionally, you can print a message indicating the completion of each iteration
     echo "Processing $forward_file and $reverse_file"
 done
-```
-
-## 2. DADA2 IN R
-
-- Load libraries and check versions
-
-```{r}
-library(dada2)
-packageVersion("dada2")
-library(ShortRead)
-packageVersion("ShortRead")
-library(Biostrings)
-packageVersion("Biostrings")
-```
-
-- Path where the sequences are saved
-```{r}
-path <- "../ITS_corredor/HN00174206/data_REANAL_2024_LAST/ITS_STANDALONE/"  ## CHANGE ME to the directory containing the fastq files.
-head(list.files(path))
-```
-
-- List of files
-```{r}
-fnFs <- sort(list.files(path, pattern = "_L001_trimmed_reads.fastq.gz", full.names = TRUE))
-```
-- Primers
-```{r}
-FWD <- "AACTTTYRRCAAYGGATCWCT"  ## CHANGE ME to your forward primer sequence
-REV <- "AGCCTCCGCTTATTGATATGCTTAART"  ## CHANGE ME...
-```
-- Check for primers (not must be present because itsxpress)
-```{r}
-allOrients <- function(primer) {
-    # Create all orientations of the input sequence
-    require(Biostrings)
-    dna <- DNAString(primer)  # The Biostrings works w/ DNAString objects rather than character vectors
-    orients <- c(Forward = dna, Complement = Biostrings::complement(dna), Reverse = Biostrings::reverse(dna),
-        RevComp = Biostrings::reverseComplement(dna))
-    return(sapply(orients, toString))  # Convert back to character vector
-}
-FWD.orients <- allOrients(FWD)
-REV.orients <- allOrients(REV)
-FWD.orients
-```
-
-```{r}
-fnFs.filtN <- file.path(path, "filtN", basename(fnFs)) 
-#filterAndTrim(fnFs, fnFs.filtN, fnRs, fnRs.filtN, maxN = 0, multithread = TRUE)
-filterAndTrim(fnFs, fnFs.filtN, maxN = 0, multithread = TRUE)
-```
-
-```{r}
-primerHits <- function(primer, fn) {
-    # Counts number of reads in which the primer is found
-    nhits <- vcountPattern(primer, sread(readFastq(fn)), fixed = FALSE)
-    return(sum(nhits > 0))
-}
-rbind(FWD.ForwardReads = sapply(FWD.orients, primerHits, fn = fnFs.filtN[[1]]),
-      #FWD.ReverseReads = sapply(FWD.orients,primerHits, fn = fnRs.filtN[[1]]))
-      REV.ForwardReads = sapply(REV.orients, primerHits, fn = fnFs.filtN[[1]]))
-      #REV.ReverseReads = sapply(REV.orients, primerHits, fn = fnRs.filtN[[1]]))
-```
-
-- Quality plot
-```{r}
-plotQualityProfile(fnFs[1:2])
-#plotQualityProfile(cutRs[1:2])
-
-```
-- Filter by quality
-
-```{r}
-filtFs <- file.path(path, "filtered", basename(fnFs))
-
-```
-
-```{r}
-out <- filterAndTrim(fnFs, filtFs, maxN = 0, maxEE = 2, truncQ = 2,
-    minLen = 50, rm.phix = TRUE, compress = TRUE, multithread = TRUE)  # on windows, set multithread = FALSE
-head(out)
-```
-- Model of lear Errors
-```{r}
-errF <- learnErrors(filtFs, multithread = TRUE)
-#plotErrors(errF, nominalQ = TRUE)
-
-```
-- Dereplication
-```{r}
-derepFs <- derepFastq(filtFs, verbose = TRUE)
-```
-- Inference of ASVs
-```{r}
-dadaFs <- dada(derepFs, err = errF, multithread = TRUE)
-dadaFs2 <- dada(derepFs, err = errF, multithread = TRUE,  OMEGA_A=1e-40, pool="pseudo" )
-
-```
-
-
-
-- Obtención de tabla de secuencias
-
-```{r, eval=FALSE}
-seqtab <- makeSequenceTable(dadaFs)
-seqtab2 <- makeSequenceTable(dadaFs2)
-dim(seqtab)
-```
-
-
-- Remoción de quimeras
-```{r, eval=FALSE}
-seqtab_nochim <- removeBimeraDenovo(seqtab, method = "consensus", multithread = T, 
-                                    verbose = T)
-seqtab_nochim2 <- removeBimeraDenovo(seqtab2, method = "consensus", multithread = T, 
-                                    verbose = T)
-dim(seqtab_nochim)
-```
-
-- Estadísticos del *denoising*
-```{r, eval=FALSE}
-getN <-function(x) sum(getUniques(x))
-# ?getUniques
-stats <- cbind(out, sapply(dadaFs, getN), 
-               rowSums(seqtab_nochim))
-
-colnames(stats) <- c("input", "filtered", "denoisedF",  "nonchim")
-
-head(stats)
-```
-
-```{r, eval=FALSE}
-stats2 <- cbind(out, sapply(dadaFs2, getN), 
-               rowSums(seqtab_nochim2))
-
-colnames(stats2) <- c("input", "filtered", "denoisedF",  "nonchim")
-
-head(stats2)
-```
-
-
-- Estadisticos de secuencias (chatGPT)
-```{r}
-library(tidyverse)
-# Obtener los nombres de las columnas de 'df'
-seqs <- colnames(seqtab)
-
-# Función para contar letras en una cadena
-contar_letras <- function(cadena) {
-  str_count(cadena, "[A-Za-z]")
-}
-
-# Aplicar la función de conteo a cada elemento de 'nombres_columnas'
-conteo_letras <- map_int(seqs, ~ contar_letras(.x))
-
-#print(conteo_letras)
-min(conteo_letras)
-max(conteo_letras)
-mean(conteo_letras)
-
-```
-
-
-```{r, echo=FALSE}
-#rename data
-seqtab_final <- as.data.frame(seqtab_nochim) %>%
-  rownames_to_column(var = "ids") %>%
-  mutate(ids = str_extract(ids, "[0-9]+[A-Z]+")) %>%
-  column_to_rownames(var = "ids")
-
-seqtab_final2 <- as.data.frame(seqtab_nochim2) %>%
-  rownames_to_column(var = "ids") %>%
-  mutate(ids = str_extract(ids, "[0-9]+[A-Z]+")) %>%
-  column_to_rownames(var = "ids")
-
-```
-
-
-- Assign taxonomy
-
-```{r}
-#----------Asignacion taxonomica-----------
-ruta_clasificador <- "../ITS_corredor/HN00174206/data_REANAL_2024_LAST/sh_general_release_dynamic_18.07.2023.fasta" # de la página de UNITE
-taxa <- assignTaxonomy(seqtab_nochim, ruta_clasificador, multithread = TRUE, tryRC = TRUE)
-taxa2 <- assignTaxonomy(seqtab_nochim2, ruta_clasificador, multithread = TRUE, tryRC = TRUE)
-
-# Visualizar lo que se genero despues de la asignacion
-taxa_print <- taxa
-rownames(taxa_print) <- NULL
-
-head(taxa_print)
-dim(taxa_print)
-```
-
-#### Exportar objetos generados durante el pre-procesamiento 
-
-```{r, eval=FALSE}
-save( seqtab_nochim2, taxa2,
-      file = "dada2_results2.RData")
-write.csv(taxa, "taxonomy.csv")
-write.csv(seqtab_final, "table_final.csv", row.names = TRUE)
-write_tsv(seqtab_final %>% rownames_to_column("#SampleID"), "table_final.txt")
-
-write.csv(stats, "stats.csv")
-
-#remotes::install_github("vmikk/metagMisc")
-library(metagMisc)
-dada_to_fasta(seqtab = seqtab, out = "seqtab.fasta")
-dada_to_fasta(seqtab = seqtab2, out = "seqtab2.fasta")
-
-
-
-```
-
-```{r, echo=FALSE}
-library("Biostrings")
-
-seqs_data = readDNAStringSet("seqtab2.fasta")
-seq_name = names(seqs_data)
-sequence = paste(seqs_data)
-df <- data.frame(seq_name, sequence)
-df= df %>% separate(seq_name, into = c("ids", "length"), sep = ";")
-taxo <- df %>% inner_join(as.data.frame(taxa2) %>% rownames_to_column(var = "sequence")) %>% 
-  unite("Taxon", Kingdom:Species, sep = ";") %>% dplyr::select("Feature ID"=ids, Taxon)
-
-data<- seqtab_final2 %>% t() %>% as.data.frame() %>% rownames_to_column(var = "sequence") %>% inner_join(df) %>% dplyr::select("#OTU ID"=ids, "111D":"623R" ) 
-write_tsv(data, "tabla2.txt")
-write_tsv(taxo, "taxonomy2_final.txt")
-
-
 ```
 

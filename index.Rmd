@@ -1,0 +1,31 @@
+---
+title: "ITS WORKFLOW"
+author: "Steph"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    theme: readable
+    highlight: tango
+    toc: true
+    toc_depth: 2
+    toc_float: true
+---
+```{r, child='./PREPROCESSING.Rmd'}
+
+```
+
+```{r, child='./ITSXPRESS_QIIME2.Rmd'}
+
+```
+
+```{r, child='./ITSXPRESS_STANDALONE.Rmd'}
+
+```
+
+```{r, child='./DADA2_OTUS_QIIME2.Rmd'}
+
+```
+
+```{r, child='./DADA2_R.Rmd'}
+
+```
