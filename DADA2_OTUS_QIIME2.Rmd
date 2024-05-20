@@ -72,6 +72,21 @@ qiime feature-table filter-features\
 Filter by length not neccesary because min length was 231.
 
 
+## DADA2 FOR UNMERGED SEQUENCES STANDALONE ISTXPRESS
+
+```
+qiime tools import   --type 'SampleData[PairedEndSequencesWithQuality]'   --input-path manifest_unmerged.txt   --output
+-path paired-end-demux-standalone.qza --input-format PairedEndFastqManifestPhred33V2
+```
+```
+qiime dada2 denoise-paired --i-
+demultiplexed-seqs paired-end-demux-standalone.qza  --p-trunc-len-f 0 --p-trunc-len-r 0
+--p-n-threads 4 --output-dir dada2_paired_standalone
+```
+
+
+
+
 ## OTU's FOR MERGED SEQUENCES
 
 For qiime2-itsxpress data, we have to export and run:

@@ -28,7 +28,7 @@ packageVersion("Biostrings")
 
 - Path where the sequences are saved
 ```{r, eval=FALSE}
-path <- "../ITS_corredor/HN00174206/data_REANAL_2024_LAST/ITS_STANDALONE/ITSxpress_merged/"  ## CHANGE ME to the directory containing the fastq files.
+path <- "../ITS_corredor/HN00174206/data_REANAL_2024_LAST/ITSxpress_STANDALONE/ITSxpress_merged/"  ## CHANGE ME to the directory containing the fastq files.
 head(list.files(path))
 ```
 
@@ -105,7 +105,7 @@ derepFs <- derepFastq(filtFs, verbose = TRUE)
 - Inference of ASVs
 ```{r, eval=FALSE}
 dadaFs <- dada(derepFs, err = errF, multithread = TRUE)
-dadaFs2 <- dada(derepFs, err = errF, multithread = TRUE,  OMEGA_A=1e-40, pool="pseudo" )
+#dadaFs2 <- dada(derepFs, err = errF, multithread = TRUE,   =1e-40, pool="pseudo" )
 
 ```
 
@@ -114,7 +114,7 @@ dadaFs2 <- dada(derepFs, err = errF, multithread = TRUE,  OMEGA_A=1e-40, pool="p
 
 ```{r, eval=FALSE}
 seqtab <- makeSequenceTable(dadaFs)
-seqtab2 <- makeSequenceTable(dadaFs2)
+#seqtab2 <- makeSequenceTable(dadaFs2)
 dim(seqtab)
 ```
 
@@ -123,8 +123,8 @@ dim(seqtab)
 ```{r, eval=FALSE}
 seqtab_nochim <- removeBimeraDenovo(seqtab, method = "consensus", multithread = T, 
                                     verbose = T)
-seqtab_nochim2 <- removeBimeraDenovo(seqtab2, method = "consensus", multithread = T, 
-                                    verbose = T)
+#seqtab_nochim2 <- removeBimeraDenovo(seqtab2, method = "consensus", multithread = T, 
+ #                                   verbose = T)
 dim(seqtab_nochim)
 ```
 
@@ -133,14 +133,14 @@ dim(seqtab_nochim)
 getN <-function(x) sum(getUniques(x))
 # ?getUniques
 stats <- cbind(out, sapply(dadaFs, getN), 
-               rowSums(seqtab_nochim2))
+               rowSums(seqtab_nochim))
 
 colnames(stats) <- c("input", "filtered", "denoisedF",  "nonchim")
 
 head(stats)
 ```
 
-```{r, eval=FALSE}
+```{r, eval=FALSE, echo=FALSE}
 stats2 <- cbind(out, sapply(dadaFs2, getN), 
                rowSums(seqtab_nochim2))
 
@@ -179,10 +179,10 @@ seqtab_final <- as.data.frame(seqtab_nochim) %>%
   mutate(ids = str_extract(ids, "[0-9]+[A-Z]+")) %>%
   column_to_rownames(var = "ids")
 
-seqtab_final2 <- as.data.frame(seqtab_nochim2) %>%
-  rownames_to_column(var = "ids") %>%
-  mutate(ids = str_extract(ids, "[0-9]+[A-Z]+")) %>%
-  column_to_rownames(var = "ids")
+#seqtab_final2 <- as.data.frame(seqtab_nochim2) %>%
+ # rownames_to_column(var = "ids") %>%
+  #mutate(ids = str_extract(ids, "[0-9]+[A-Z]+")) %>%
+  #column_to_rownames(var = "ids")
 
 ```
 
@@ -209,7 +209,7 @@ dim(taxa_print)
 save( seqtab_nochim2, taxa2,
       file = "dada2_results2.RData")
 write.csv(taxa, "taxonomy.csv")
-write.csv(seqtab_final, "table_final.csv", row.names = TRUE)
+#write.csv(seqtab_final, "table_final.csv", row.names = TRUE)
 write_tsv(seqtab_final %>% rownames_to_column("#SampleID"), "table_final.txt")
 
 write.csv(stats, "stats.csv")
@@ -217,7 +217,7 @@ write.csv(stats, "stats.csv")
 #remotes::install_github("vmikk/metagMisc")
 library(metagMisc)
 dada_to_fasta(seqtab = seqtab, out = "seqtab.fasta")
-dada_to_fasta(seqtab = seqtab2, out = "seqtab2.fasta")
+#dada_to_fasta(seqtab = seqtab2, out = "seqtab2.fasta")
 
 
 
@@ -226,7 +226,7 @@ dada_to_fasta(seqtab = seqtab2, out = "seqtab2.fasta")
 ```{r, echo=FALSE, eval=FALSE}
 library("Biostrings")
 
-seqs_data = readDNAStringSet("seqtab2.fasta")
+seqs_data = readDNAStringSet("seqtab.fasta")
 seq_name = names(seqs_data)
 sequence = paste(seqs_data)
 df <- data.frame(seq_name, sequence)
@@ -234,8 +234,8 @@ df= df %>% separate(seq_name, into = c("ids", "length"), sep = ";")
 taxo <- df %>% inner_join(as.data.frame(taxa2) %>% rownames_to_column(var = "sequence")) %>% 
   unite("Taxon", Kingdom:Species, sep = ";") %>% dplyr::select("Feature ID"=ids, Taxon)
 
-data<- seqtab_final2 %>% t() %>% as.data.frame() %>% rownames_to_column(var = "sequence") %>% inner_join(df) %>% dplyr::select("#OTU ID"=ids, "111D":"623R" ) 
-write_tsv(data, "tabla2.txt")
+data<- seqtab_final %>% t() %>% as.data.frame() %>% rownames_to_column(var = "sequence") %>% inner_join(df) %>% dplyr::select("#OTU ID"=ids, "111D":"623R" ) 
+write_tsv(data, "tabla.txt")
 write_tsv(taxo, "taxonomy2_final.txt")
 
 
@@ -525,3 +525,5 @@ write_tsv(taxo, "taxonomy3_final.txt")
 
 
 ```
+
+

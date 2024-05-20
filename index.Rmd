@@ -29,3 +29,7 @@ output:
 ```{r, child='./DADA2_R.Rmd'}
 
 ```
+
+```{r, child='./COMPARING.Rmd'}
+
+```
